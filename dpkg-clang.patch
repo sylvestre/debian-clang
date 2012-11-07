@@ -1,0 +1,179 @@
+diff -ru a/dpkg-deb/build.c b/dpkg-deb/build.c
+--- a/dpkg-deb/build.c	2012-07-23 17:43:59.712008497 +0300
++++ b/dpkg-deb/build.c	2012-07-23 17:45:54.632008496 +0300
+@@ -292,6 +292,7 @@
+   "Built-Using",
+   "Package-Type",
+   "Subarchitecture",
++  "Compiler",
+   "Kernel-Version",
+   "Installer-Menu-Item",
+   "Homepage",
+@@ -373,10 +374,15 @@
+   char *path;
+   const char *versionstring, *arch_sep;
+ 
++  char *compiler;
++
++  compiler = getenv("CC");
++  if (!compiler) compiler = "";
++
+   versionstring = versiondescribe(&pkg->available.version, vdew_never);
+   arch_sep = pkg->available.arch->type == arch_none ? "" : "_";
+-  m_asprintf(&path, "%s/%s_%s%s%s%s", dir, pkg->set->name, versionstring,
+-             arch_sep, pkg->available.arch->name, DEBEXT);
++  m_asprintf(&path, "%s/%s_%s%s%s_%s%s", dir, pkg->set->name, versionstring,
++             arch_sep, pkg->available.arch->name, compiler, DEBEXT);
+ 
+   return path;
+ }
+diff -ru a/scripts/Dpkg/Control/Fields.pm b/scripts/Dpkg/Control/Fields.pm
+--- a/scripts/Dpkg/Control/Fields.pm	2012-07-23 17:44:07.740008497 +0300
++++ b/scripts/Dpkg/Control/Fields.pm	2012-07-23 17:45:54.632008496 +0300
+@@ -105,6 +105,9 @@
+     'Closes' => {
+         allowed => ALL_CHANGES,
+     },
++	'Compiler' => {
++		allowed => CTRL_PKG_DEB,
++	},
+     'Conffiles' => {
+         allowed => CTRL_FILE_STATUS,
+     },
+@@ -296,7 +299,7 @@
+ our %FIELD_ORDER = (
+     CTRL_PKG_DEB() => [
+         qw(Package Package-Type Source Version Built-Using Kernel-Version
+-        Architecture Subarchitecture Installer-Menu-Item Essential Origin Bugs
++        Architecture Compiler Subarchitecture Installer-Menu-Item Essential Origin Bugs
+         Maintainer Installed-Size), &field_list_pkg_dep(),
+         qw(Section Priority Multi-Arch Homepage Description Tag Task)
+     ],
+Only in b/scripts/Dpkg/Control: Fields.pm.orig
+diff -ru a/scripts/dpkg-buildpackage.pl b/scripts/dpkg-buildpackage.pl
+--- a/scripts/dpkg-buildpackage.pl	2012-07-23 17:44:09.596008496 +0300
++++ b/scripts/dpkg-buildpackage.pl	2012-07-23 17:45:54.632008496 +0300
+@@ -36,6 +36,7 @@
+ use Dpkg::Changelog::Parse;
+ use Dpkg::Path qw(find_command);
+ use Dpkg::IPC;
++use Term::ANSIColor;
+ 
+ textdomain("dpkg-dev");
+ 
+@@ -148,6 +149,35 @@
+                internerr("build_opt called with include=$include")))));
+ }
+ 
++    
++sub locate_compilers {
++    my %compilers = ('CC' => '/usr/bin/cc', 'CXX' => '/usr/bin/c++', 'OBJC' => '/usr/bin/objcc', 'FC' => '/usr/bin/f90');
++
++    foreach (keys %compilers) {
++        my $file = $compilers{$_};
++        $file = readlink $file while ( -l $file);
++        my @values = split('/', $file);
++        @values = split('-', $values[$#values]);
++        $compilers{$_} = $values[0];
++    }
++
++    return %compilers;
++}
++sub debian_rules_parser {
++	my $rulesfile = shift;
++
++	open FILE, "<$rulesfile" or die $!;
++	my @lines = <FILE>;
++	my @hard_compiler = grep(/CC[ \t]*:?=(?!.*$ENV{CC}.*)/, @lines);
++	if (@hard_compiler) {
++		print color 'bold red';
++		print "There is a hard-coded compiler in $rulesfile, but the default compiler is $ENV{CC}!\n";
++		print @hard_compiler;
++		print color 'reset';
++		die "Hard-coded compiler in $rulesfile !\n";
++	}
++}
++
+ while (@ARGV) {
+     $_ = shift @ARGV;
+ 
+@@ -288,6 +318,10 @@
+ my $cwd = cwd();
+ my $dir = basename($cwd);
+ 
++my %compilers = locate_compilers;
++$ENV{$_} = $compilers{$_} foreach (keys %compilers);
++debian_rules_parser 'debian/rules';
++
+ my $changelog = changelog_parse();
+ 
+ my $pkg = mustsetvar($changelog->{source}, _g('source package'));
+Only in b/scripts: dpkg-buildpackage.pl.orig
+diff -ru a/scripts/dpkg-genchanges.pl b/scripts/dpkg-genchanges.pl
+--- a/scripts/dpkg-genchanges.pl	2012-07-23 17:44:08.700008495 +0300
++++ b/scripts/dpkg-genchanges.pl	2012-07-23 17:45:54.632008496 +0300
+@@ -230,7 +230,8 @@
+ if (not is_sourceonly) {
+     open(FL, "<", $fileslistfile) || syserr(_g("cannot read files list file"));
+     while(<FL>) {
+-	if (m/^(([-+.0-9a-z]+)_([^_]+)_([-\w]+)\.u?deb) (\S+) (\S+)$/) {
++	if (m/^(([-+.0-9a-z]+)_([^_]+)_([-\w]+)_(?:[-\w]+_)?\.u?deb) (\S+) (\S+)$/) {
++		# ((name)_(version)_(architecture)_compiler.extension) (section) (prioriry)
+ 	    defined($p2f{"$2 $4"}) &&
+ 		warning(_g("duplicate files list entry for package %s (line %d)"),
+ 			$2, $.);
+Only in b/scripts: dpkg-genchanges.pl.orig
+diff -ru a/scripts/dpkg-gencontrol.pl b/scripts/dpkg-gencontrol.pl
+--- a/scripts/dpkg-gencontrol.pl	2012-07-23 17:44:09.612008496 +0300
++++ b/scripts/dpkg-gencontrol.pl	2012-07-23 17:48:17.944008496 +0300
+@@ -238,6 +238,8 @@
+ }
+ 
+ $fields->{'Version'} = $binaryversion;
++$fields->{'Compiler'} = $ENV{'CC'};
++
+ 
+ # Process dependency fields in a second pass, now that substvars have been
+ # initialized.
+@@ -378,8 +380,8 @@
+ }
+ my $sversion = $fields->{'Version'};
+ $sversion =~ s/^\d+://;
+-$forcefilename = sprintf("%s_%s_%s.%s", $oppackage, $sversion,
+-                         $fields->{'Architecture'} || "", $pkg_type)
++$forcefilename = sprintf("%s_%s_%s_%s.%s", $oppackage, $sversion,
++                         $fields->{'Architecture'} || "", $fields->{'Compiler'}, $pkg_type)
+ 	   unless ($forcefilename);
+ print(Y $substvars->substvars(sprintf("%s %s %s\n", $forcefilename,
+ 				      $fields->{'Section'} || '-',
+Only in b/scripts: dpkg-gencontrol.pl.orig
+diff -ru a/scripts/dpkg-name.pl b/scripts/dpkg-name.pl
+--- a/scripts/dpkg-name.pl	2012-07-23 17:44:08.764008498 +0300
++++ b/scripts/dpkg-name.pl	2012-07-23 17:45:54.636008495 +0300
+@@ -122,11 +122,14 @@
+     (my $version = $fields->{Version}) =~ s/.*://;
+     my $type = $fields->{'Package-Type'} || 'deb';
+ 
++	my $compiler = $fields->{'Compiler'} // '';
++	$compiler = "_$compiler" if $compiler;
++
+     my $tname;
+     if ($options{architecture}) {
+-        $tname = "$pkg\_$version\_$arch.$type";
++        $tname = "$pkg\_$version\_${arch}$compiler.$type";
+     } else {
+-        $tname = "$pkg\_$version.$type";
++        $tname = "$pkg\_{$version}$compiler.$type";
+     }
+     (my $name = $tname) =~ s/ //g;
+     if ($tname ne $name) { # control fields have spaces
+diff -ru a/scripts/dpkg-source.pl b/scripts/dpkg-source.pl
+--- a/scripts/dpkg-source.pl	2012-07-23 17:44:10.828008497 +0300
++++ b/scripts/dpkg-source.pl	2012-07-23 17:45:54.636008495 +0300
+@@ -1,4 +1,4 @@
+-#! /usr/bin/perl
++#!/usr/bin/perl
+ # vim: set et sw=4 ts=8
+ #
+ # dpkg-source
+
