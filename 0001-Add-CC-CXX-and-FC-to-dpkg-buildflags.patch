@@ -1,0 +1,90 @@
+From 10c97d9c5b50a27a80b2d09bd2df9a283eca455f Mon Sep 17 00:00:00 2001
+From: Sylvestre Ledru <sylvestre.ledru@scilab-enterprises.com>
+Date: Wed, 29 Aug 2012 17:41:18 +0200
+Subject: [PATCH] Add CC, CXX and FC to dpkg-buildflags
+
+---
+ man/dpkg-buildflags.1      |    9 +++++++++
+ scripts/Dpkg/BuildFlags.pm |    9 +++++++++
+ scripts/mk/buildflags.mk   |    5 ++++-
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/man/dpkg-buildflags.1 b/man/dpkg-buildflags.1
+index ea61306..63ed7a0 100644
+--- a/man/dpkg-buildflags.1
++++ b/man/dpkg-buildflags.1
+@@ -139,6 +139,15 @@ Show the version and exit.
+ .
+ .SH SUPPORTED FLAGS
+ .TP
++.B CC
++Default C compiler.
++.TP
++.B CXX
++Default C++ compiler.
++.TP
++.B FC
++Default Fortran compiler.
++.TP
+ .B CFLAGS
+ Options for the C compiler. The default value set by the vendor
+ includes \fI\-g\fP and the default optimization level (\fI\-O2\fP usually,
+diff --git a/scripts/Dpkg/BuildFlags.pm b/scripts/Dpkg/BuildFlags.pm
+index 5858dca..a7b273f 100644
+--- a/scripts/Dpkg/BuildFlags.pm
++++ b/scripts/Dpkg/BuildFlags.pm
+@@ -73,6 +73,9 @@ sub load_vendor_defaults {
+     my $build_opts = Dpkg::BuildOptions->new();
+     my $default_flags = $build_opts->has("noopt") ? "-g -O0" : "-g -O2";
+     $self->{flags} = {
++	CC       => '/usr/bin/cc',
++	CXX      => '/usr/bin/c++',
++	FC       => 'gfortran',
+ 	CPPFLAGS => '',
+ 	CFLAGS   => $default_flags,
+ 	CXXFLAGS => $default_flags,
+@@ -80,6 +83,9 @@ sub load_vendor_defaults {
+ 	LDFLAGS  => '',
+     };
+     $self->{origin} = {
++	CC       => 'vendor',
++	CXX      => 'vendor',
++	FC       => 'vendor',
+ 	CPPFLAGS => 'vendor',
+ 	CFLAGS   => 'vendor',
+ 	CXXFLAGS => 'vendor',
+@@ -87,6 +93,9 @@ sub load_vendor_defaults {
+ 	LDFLAGS  => 'vendor',
+     };
+     $self->{maintainer} = {
++	CC       => 0,
++	CXX      => 0,
++	FC       => 0,
+ 	CPPFLAGS => 0,
+ 	CFLAGS   => 0,
+ 	CXXFLAGS => 0,
+diff --git a/scripts/mk/buildflags.mk b/scripts/mk/buildflags.mk
+index 8f0f215..ba17bcc 100644
+--- a/scripts/mk/buildflags.mk
++++ b/scripts/mk/buildflags.mk
+@@ -1,5 +1,8 @@
+ # This Makefile snippet defines the following variables:
+ #
++# CC: the C compiler
++# CXX: the C++ compiler
++# FC: the Fortran compiler
+ # CFLAGS: flags for the C compiler
+ # CPPFLAGS: flags for the C preprocessor
+ # CXXFLAGS: flags for the C++ compiler
+@@ -14,7 +17,7 @@
+ 
+ dpkg_late_eval ?= $(or $(value DPKG_CACHE_$(1)),$(eval DPKG_CACHE_$(1) := $(shell $(2)))$(value DPKG_CACHE_$(1)))
+ 
+-DPKG_BUILDFLAGS_LIST = CFLAGS CPPFLAGS CXXFLAGS FFLAGS LDFLAGS
++DPKG_BUILDFLAGS_LIST = CC CXX FC CFLAGS CPPFLAGS CXXFLAGS FFLAGS LDFLAGS
+ 
+ define dpkg_buildflags_export_envvar
+ ifdef $(1)
+-- 
+1.7.10.4
+

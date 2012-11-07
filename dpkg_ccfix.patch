@@ -1,0 +1,12 @@
+diff -urN c/scripts/dpkg-buildpackage.pl b/scripts/dpkg-buildpackage.pl
+--- c/scripts/dpkg-buildpackage.pl	2012-08-23 22:07:25.079852002 +0300
++++ b/scripts/dpkg-buildpackage.pl	2012-08-23 18:51:06.707850809 +0300
+@@ -168,7 +168,7 @@
+ 
+ 	open FILE, "<$rulesfile" or die $!;
+ 	my @lines = <FILE>;
+-	my @hard_compiler = grep(/CC[ \t]*:?=(?!.*$ENV{CC}.*)/, @lines);
++	my @hard_compiler = grep(/^[^#]*CC[ \t]*:?=(?!.*$ENV{CC}.*)/, @lines);
+ 	if (@hard_compiler) {
+ 		print color 'bold red';
+ 		print "There is a hard-coded compiler in $rulesfile, but the default compiler is $ENV{CC}!\n";
