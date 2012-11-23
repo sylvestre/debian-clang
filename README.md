@@ -11,3 +11,10 @@ Script to kill any usage of gcc/g++/cpp
 
 **purge-gcc-setup-clang.sh**
 Remove all instances of cpp/g++ & gcc + configure clang as /usr/bin/cc & /usr/bin/c++
+
+**sbuild.patch**
+To plug pre build hooks (after the apt-get install)
+"chroot-pre-build-commands" => [
+      	['/root/purge-gcc-setup-clang.sh'],
+],
+in .sbuildrc

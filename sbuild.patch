@@ -1,0 +1,187 @@
+diff -ur a/lib/Buildd/ClientConf.pm b/lib/Buildd/ClientConf.pm
+--- a/lib/Buildd/ClientConf.pm	2012-06-01 00:54:02.997262729 +0300
++++ b/lib/Buildd/ClientConf.pm	2012-06-22 20:12:19.288006243 +0300
+@@ -103,9 +103,9 @@
+ 	    HELP => 'Path to ssh binary'
+ 	},
+ 	'WANNA_BUILD_SSH_CMD'			=> {
+-	    TYPE => 'STRING',
++	    TYPE => 'ARRAY',
+ 	    GROUP => '__INTERNAL',
+-	    DEFAULT => '',
++	    DEFAULT => [],
+ 	    HELP => 'Command to run wanna-build (set automatically from the other wanna-build options)'
+ 	},
+ 	'WANNA_BUILD_SSH_USER'			=> {
+diff -ur a/lib/Sbuild/Build.pm b/lib/Sbuild/Build.pm
+--- a/lib/Sbuild/Build.pm	2012-06-01 00:54:03.001262795 +0300
++++ b/lib/Sbuild/Build.pm	2012-08-14 03:19:07.707853705 +0300
+@@ -62,6 +62,7 @@
+ 
+ our $saved_stdout = undef;
+ our $saved_stderr = undef;
++my %compilers  = locate_compilers();
+ 
+ sub new {
+     my $class = shift;
+@@ -518,6 +519,7 @@
+ 
+ 	$self->check_abort();
+ 	$self->run_chroot_update();
++	$self->run_chroot_config_compiler();
+ 
+ 	$self->check_abort();
+ 	$self->run_fetch_install_packages();
+@@ -595,6 +597,43 @@
+     }
+ }
+ 
++sub run_chroot_config_compiler {
++    my $self = shift;
++    my $resolver = $self->get('Dependency Resolver');
++
++    $self->log("Install the compilers\n");
++
++        foreach (keys %compilers){
++                $self->log('Install ' . $_ .' compiler: Running apt-get -a ' . $self->get('Host Arch') . ' install ' . $compilers{$_} . "\n");
++                $resolver->run_apt_command(
++                    { COMMAND => [$self->get_conf('APT_GET'),  '-a' . $self->get('Host Arch'), 'install', '-yf', $compilers{$_}],
++                    ENV => {'DEBIAN_FRONTEND' => 'noninteractive'},
++                    USER => 'root',
++                    DIR => '/' });
++                if ($?) {
++                    $self->log("Failed to install compiler\n");
++                    return 1;
++				}
++
++                $self->log("Update alternatives to use default compiler\n");
++		
++                if($_ eq 'CC'){
++                        $resolver->run_apt_command(
++                            { COMMAND => ['update-alternatives',  '--set' , 'cc', '/usr/bin/' . $compilers{$_}],
++                            ENV => {'DEBIAN_FRONTEND' => 'noninteractive'},
++                            USER => 'root',
++                            DIR => '/' });
++                }
++                elsif($_ eq "CXX"){
++                        $resolver->run_apt_command(
++                            { COMMAND => ['update-alternatives',  '--set' , 'c++', '/usr/bin/' . $compilers{$_} .'++'],
++                            ENV => {'DEBIAN_FRONTEND' => 'noninteractive'},
++                            USER => 'root',
++                            DIR => '/' });
++                }
++        }
++}
++
+ # Fetch sources, run setup, fetch and install core and package build
+ # deps, then run build.  Cleans up build directory and uninstalls
+ # build depends on return/failure.
+@@ -696,6 +735,11 @@
+ 	$resolver->dump_build_environment();
+ 
+ 	$self->check_abort();
++	$self->run_external_commands('chroot-pre-build-commands',
++		$self->get_conf('LOG_EXTERNAL_COMMAND_OUTPUT'),
++		$self->get_conf('LOG_EXTERNAL_COMMAND_ERROR'));
++
++	$self->check_abort();
+ 	if ($self->build()) {
+ 	    $self->set_status('successful');
+ 	} else {
+@@ -1095,6 +1139,9 @@
+     } elsif ($stage eq "chroot-setup-commands") {
+ 	$self->log_subsection("Chroot Setup Commands");
+ 	$chroot = 1;
++    } elsif ($stage eq "chroot-pre-build-commands") {
++	$self->log_subsection("Chroot Pre Build Commands");
++	$chroot = 1;
+     } elsif ($stage eq "chroot-cleanup-commands") {
+ 	$self->log_subsection("Chroot Cleanup Commands");
+ 	$chroot = 1;
+@@ -2354,4 +2401,18 @@
+     symlink $log, $dest;
+ }
+ 
++sub locate_compilers {
++    my %compilers = ('CC' => '/usr/bin/cc', 'CXX' => '/usr/bin/c++');
++
++    foreach (keys %compilers) {
++        my $file = $compilers{$_};
++        $file = readlink $file while ( -l $file);
++        my @values = split('/', $file);
++        @values = split('-', $values[$#values]);
++        $compilers{$_} = $values[0];
++    }
++
++    return %compilers;
++}
++
+ 1;
+diff -ur a/lib/Sbuild/Chroot.pm b/lib/Sbuild/Chroot.pm
+--- a/lib/Sbuild/Chroot.pm	2012-06-01 00:54:03.001262795 +0300
++++ b/lib/Sbuild/Chroot.pm	2012-06-22 20:02:41.124012188 +0300
+@@ -288,6 +288,8 @@
+     my $commandfilter = $options->{'ENV_FILTER'};
+     push(@filter, @{$commandfilter}) if defined($commandfilter);
+ 
++	# Disable this because sbuild.conf is not read
++	if (0) {
+     # Sanitise environment
+     foreach my $var (keys %ENV) {
+ 	my $match = 0;
+@@ -303,6 +305,7 @@
+ 	    debug2("Environment filter: Kept $var\n");
+ 	}
+     }
++	} # if (0)
+ 
+     debug2("PROGRAM: $program\n");
+     debug2("COMMAND: ", join(" ", @{$options->{'COMMAND'}}), "\n");
+diff -ur a/lib/Sbuild/ConfBase.pm b/lib/Sbuild/ConfBase.pm
+--- a/lib/Sbuild/ConfBase.pm	2012-06-01 00:54:03.001262795 +0300
++++ b/lib/Sbuild/ConfBase.pm	2012-06-22 20:02:41.124012188 +0300
+@@ -85,6 +85,7 @@
+ 		   $conf->get('MAILTO_HASH')->{$value})
+ 	    if ($value &&
+ 		$conf->get('DISTRIBUTION') &&
++		defined($conf->get('MAILTO_HASH')) &&
+ 		$conf->get('MAILTO_HASH')->{$value});
+     };
+ 
+diff -ur a/lib/Sbuild/Conf.pm b/lib/Sbuild/Conf.pm
+--- a/lib/Sbuild/Conf.pm	2012-06-01 00:54:03.001262795 +0300
++++ b/lib/Sbuild/Conf.pm	2012-08-14 03:16:12.727849643 +0300
+@@ -969,6 +969,7 @@
+ 	    DEFAULT => {
+ 		"pre-build-commands" => [],
+ 		"chroot-setup-commands" => [],
++		"chroot-pre-build-commands" => [],
+ 		"chroot-cleanup-commands" => [],
+ 		"post-build-commands" => [],
+ 	    },
+@@ -983,6 +984,10 @@
+         [\'foo\', \'arg1\', \'arg2\'],
+         [\'bar\', \'arg1\', \'arg2\', \'arg3\'],
+     ],
++	"chroot-pre-build-commands" => [
++		[\'foo\', \'arg1\', \'arg2\'],
++        [\'bar\', \'arg1\', \'arg2\', \'arg3\'],
++	],
+     "chroot-cleanup-commands" => [
+         [\'foo\', \'arg1\', \'arg2\'],
+         [\'bar\', \'arg1\', \'arg2\', \'arg3\'],
+diff -ur a/lib/Sbuild/Options.pm b/lib/Sbuild/Options.pm
+--- a/lib/Sbuild/Options.pm	2012-06-01 00:54:03.001262795 +0300
++++ b/lib/Sbuild/Options.pm	2012-08-14 03:17:27.139852282 +0300
+@@ -256,6 +256,11 @@
+ 			   push(@{${$self->get_conf('EXTERNAL_COMMANDS')}{"chroot-setup-commands"}},
+ 				\@command);
+ 		       },
++			"chroot-pre-build-commands=s" => sub {
++			   my @command = split(/\s+/, $_[1]);
++			   push(@{${$self->get_conf('EXTERNAL_COMMANDS')}{"chroot-pre-build-commands"}},
++				\@command);
++		       },
+ 			"chroot-cleanup-commands=s" => sub {
+ 			   my @command = split(/\s+/, $_[1]);
+ 			   push(@{${$self->get_conf('EXTERNAL_COMMANDS')}{"chroot-cleanup-commands"}},
