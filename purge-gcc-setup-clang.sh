@@ -1,6 +1,6 @@
 #!/bin/bash
-# Here, we have two choice:                  
-# * replace gcc by clang 
+# Here, we have two choice:
+# * replace gcc by clang
 # * fails on the usage of gcc
 
 echo "Check if we are using the patched version of dpkg"
@@ -28,3 +28,7 @@ update-alternatives --set cc /usr/bin/clang
 echo "update-alternatives --set c++ /usr/bin/clang++"
 update-alternatives --set c++ /usr/bin/clang++
 
+echo "CC = $CC"
+echo "CXX = $CXX"
+echo "/usr/bin/cc = $(readlink /etc/alternatives/cc)"
+echo "/usr/bin/c++ = $(readlink /etc/alternatives/c++)"
