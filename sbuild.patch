@@ -65,7 +65,7 @@ diff -ur a/lib/Sbuild/Build.pm b/lib/Sbuild/Build.pm
 +                }
 +                elsif($_ eq "CXX"){
 +                        $resolver->run_apt_command(
-+                            { COMMAND => ['update-alternatives',  '--set' , 'c++', '/usr/bin/' . $compilers{$_} .'++'],
++                            { COMMAND => ['update-alternatives',  '--set' , 'c++', '/usr/bin/' . $compilers{$_}],
 +                            ENV => {'DEBIAN_FRONTEND' => 'noninteractive'},
 +                            USER => 'root',
 +                            DIR => '/' });
