@@ -1,0 +1,44 @@
+Create a new node
+
+Install the buildd as specified:
+http://wiki.debian.org/SetupBuildServiceForWanna-build#Setup_Buildd_and_Sbuild
+
+Apply sbuild.patch
+
+echo "buildd hold"|dpkg --set-selections
+
+Copy .sbuildrc and .builddrc to ~buildd/
+scp root@kolocep.inria.fr:/org/buildd-amd64/.builddrc .
+scp root@kolocep.inria.fr:/org/buildd-amd64/.sbuildrc .
+Update of the host in .builddrc
+Update        logs_mailed_to => "root", to buildd
+
+# Setup the mail install
+in /etc/aliases add
+buildd: buildd@buildd-clang.debian.net
+newaliases
+
+in /srv/chroot/
+git clone https://github.com/sylvestre/debian-clang.git
+cp debian-clang/dpkg-patched/*deb  /srv/chroot/sid-amd64-sbuild/root
+cd /usr/share/perl5/
+patch -p2 < /srv/chroot/debian-clang/sbuild.patch
+
+# Install in the chroot the patched version of dpkg
+chroot /srv/chroot/sid-amd64-sbuild/
+cd /root/
+dpkg -i *deb
+apt-get -f install
+echo "dpkg hold"|dpkg --set-selections
+echo "dpkg-dev hold"|dpkg --set-selections
+echo "libdpkg-perl hold"|dpkg --set-selections
+exit
+
+# Setup the hooks
+cd /srv/chroot/sid-amd64-sbuild/root/
+ln  ../../debian-clang/clang-setup.sh
+ln  ../../debian-clang/purge-gcc-setup-clang.sh
+ln  ../../debian-clang/gcc-replacement.sh
+
+su - buildd
+buildd
