@@ -11,12 +11,13 @@ cd /srv/chroot/
 git clone https://github.com/sylvestre/debian-clang.git
 cp sbuildrc ~buildd/.sbuildrc
 cp builddrc ~buildd/.builddrc
+cp debian-clang/dpkg-patched/*deb  /srv/chroot/sid-amd64-sbuild/root
 
 # Setup the mail install
 in /etc/aliases add
 buildd: buildd@buildd-clang.debian.net
 newaliases
-cp debian-clang/dpkg-patched/*deb  /srv/chroot/sid-amd64-sbuild/root
+
 cd /usr/share/perl5/
 patch -p2 < /srv/chroot/debian-clang/sbuild.patch
 
@@ -38,3 +39,8 @@ ln  ../../debian-clang/gcc-replacement.sh
 
 su - buildd
 buildd
+
+
+To Debug:
+tail -f /var/log/buildd.log /var/lib/buildd/daemon.log
+Also look at the build log in build/*.build
