@@ -7,19 +7,15 @@ Apply sbuild.patch
 
 echo "buildd hold"|dpkg --set-selections
 
-Copy .sbuildrc and .builddrc to ~buildd/
-scp root@kolocep.inria.fr:/org/buildd-amd64/.builddrc .
-scp root@kolocep.inria.fr:/org/buildd-amd64/.sbuildrc .
-Update of the host in .builddrc
-Update        logs_mailed_to => "root", to buildd
+cd /srv/chroot/
+git clone https://github.com/sylvestre/debian-clang.git
+cp sbuildrc ~buildd/.sbuildrc
+cp builddrc ~buildd/.builddrc
 
 # Setup the mail install
 in /etc/aliases add
 buildd: buildd@buildd-clang.debian.net
 newaliases
-
-in /srv/chroot/
-git clone https://github.com/sylvestre/debian-clang.git
 cp debian-clang/dpkg-patched/*deb  /srv/chroot/sid-amd64-sbuild/root
 cd /usr/share/perl5/
 patch -p2 < /srv/chroot/debian-clang/sbuild.patch
