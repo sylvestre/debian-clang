@@ -1,0 +1,37 @@
+$build_arch = 'amd64';
+$distribution = 'sid';
+@distributions = (
+        {
+                dist_name => ['sid'],
+                built_architecture => 'amd64',
+                wanna_build_ssh_host => "buildd-clang.debian.net",
+                wanna_build_ssh_user => "buildd",
+                wanna_build_db_user => 'wbadm',
+                dupload_local_queue_dir => "upload",
+                logs_mailed_to => "buildd",
+        }
+);
+$host_arch = 'amd64';
+$daemon_log_file = '/var/log/buildd.log';
+$idle_sleep_time = 300;
+$debug = 16;
+$verbose = 16;
+$admin_mail = 'root';
+$log_queued_messages = 1;
+$apt_get = 'apt-get';
+$mailprog = '/usr/sbin/sendmail';
+$ssh = 'ssh';
+$sudo = 'sudo';
+$upload_queues = [
+        {
+                dupload_local_queue_dir => "upload",
+                dupload_archive_name => "anonymous-ftp-master",
+        }
+];
+$statistics_mail = 'sylvestre@debian.org';
+$wanna_build_built_architecture = 'amd64';
+$wanna_build_db_user = 'wbadm';
+$wanna_build_ssh_host = 'localhost';
+$wanna_build_ssh_socket = '/var/buildd.sock';
+$wanna_build_ssh_user = 'buildd';
+1;
