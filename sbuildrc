@@ -2,8 +2,8 @@ $external_commands = {
 	"chroot-setup-commands" => [
 		['/root/clang-setup.sh'],
 	],
-    	"chroot-pre-build-commands" => [
-        	['/root/purge-gcc-setup-clang.sh'],
-    	],
+#    	"chroot-pre-build-commands" => [
+#        	['/root/purge-gcc-setup-clang.sh'],
+#    	],
 };
 
