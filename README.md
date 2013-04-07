@@ -8,9 +8,11 @@ Install clang and make sure dpkg is not updated (since we use a patched version)
 
 **gcc-replacement.sh**
 Script to kill any usage of gcc/g++/cpp
+=> No longer used for now
 
 **purge-gcc-setup-clang.sh**
 Remove all instances of cpp/g++ & gcc + configure clang as /usr/bin/cc & /usr/bin/c++
+=> No longer used for now
 
 **sbuild.patch**
 To plug pre build hooks (after the apt-get install)
