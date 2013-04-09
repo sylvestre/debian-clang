@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "deb http://ftp.fr.debian.org/debian/ experimental main" >> /etc/apt/sources.list
+echo "deb http://ftp.fr.debian.org/debian/ experimental main" > /etc/apt/sources.list.d/clang.list
 
 echo "Install of clang"
 apt-get update
