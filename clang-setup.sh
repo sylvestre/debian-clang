@@ -8,7 +8,7 @@ aptitude -y --without-recommends install cpp g++ gcc clang -t experimental
 #apt-get install --yes --no-install-recommends clang -t experimental
 
 echo "Replace gcc, g++ & cpp by clang"
-VERSIONS="4.8 4.7"
+VERSIONS="4.8 4.7 4.6"
 for VERSION in $VERSIONS; do
 cd /usr/bin
 rm g++-$VERSION gcc-$VERSION cpp-$VERSION
