@@ -2,7 +2,7 @@
 
 echo "Install of clang"
 apt-get update
-aptitude -y --without-recommends install cpp g++ gcc clang-3.2
+aptitude -y --without-recommends install cpp g++ gcc clang-3.3
 #apt-get install --yes --no-install-recommends clang -t experimental
 
 echo "Replace gcc, g++ & cpp by clang"
